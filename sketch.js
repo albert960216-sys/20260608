@@ -6,7 +6,7 @@ let ball;
 let modelLoaded = false; // 用於自我檢查模型載入狀態
 let bricks = [];
 let gameState = "WAITING"; // 遊戲狀態：WAITING, PLAY, GAMEOVER
-const rows = 3;
+const rows = 5; // 增加到 5 層
 const cols = 8;
 
 function setup() {
@@ -39,11 +39,18 @@ function windowResized() {
 function resetGame() {
   ball = new Ball();
   bricks = [];
-  let brickWidth = width / cols;
-  let brickHeight = 25;
+  let baseWidth = width / cols;
+  let baseHeight = 25;
+  let brickWidth = baseWidth * 0.8; // 縮小到 80%
+  let brickHeight = baseHeight * 0.8; // 縮小到 80%
+
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
-      bricks.push(new Brick(c * brickWidth + brickWidth / 2, r * brickHeight + 50, brickWidth - 5, brickHeight - 5, r));
+      let b = new Brick(c * baseWidth + baseWidth / 2, r * baseHeight + 50, brickWidth, brickHeight, r);
+      if (random(1) < 0.15) {
+        b.active = false; // 15% 的機率消失
+      }
+      bricks.push(b);
     }
   }
   gameState = "WAITING";
@@ -75,6 +82,19 @@ function draw() {
     fill(0, 255, 0);
     noStroke();
     ellipse(indexFinger.x, indexFinger.y, 15, 15);
+
+    // 檢查是否「手部打開」以重新開始遊戲
+    if (gameState === "GAMEOVER") {
+      let isOpen = hand.index_finger_tip.y < hand.index_finger_pip.y &&
+                   hand.middle_finger_tip.y < hand.middle_finger_pip.y &&
+                   hand.ring_finger_tip.y < hand.ring_finger_pip.y &&
+                   hand.pinky_finger_tip.y < hand.pinky_finger_pip.y;
+      
+      if (isOpen) {
+        resetGame();
+        gameState = "PLAY";
+      }
+    }
 
     // 如果目前在等待狀態且偵測到手，就開始遊戲
     if (gameState === "WAITING") {
@@ -139,14 +159,8 @@ function draw() {
     textSize(48);
     text("GAME OVER", width / 2, height / 2);
     textSize(20);
-    text("Press 'R' to Restart", width / 2, height / 2 + 50);
+    text("Open Hand to Restart", width / 2, height / 2 + 50);
     pop();
-  }
-}
-
-function keyPressed() {
-  if (key === 'r' || key === 'R') {
-    resetGame();
   }
 }
 
@@ -179,8 +193,21 @@ class Ball {
 
   checkPaddle(px, py, pw) {
     // 簡單的圓形與矩形碰撞偵測
-    if (this.y + this.r > py - 10 && this.x > px - pw / 2 && this.x < px + pw / 2) {
-      if (this.speedY > 0) this.speedY *= -1;
+    // 檢查球是否從上方撞擊擋板
+    if (this.y + this.r >= py - 10 && this.y - this.r <= py + 10 && 
+        this.x + this.r > px - pw / 2 && this.x - this.r < px + pw / 2) {
+      
+      // 確保球是向下移動時才反彈 (避免從側面或下方誤判)
+      if (this.speedY > 0) {
+        this.speedY *= -1; // 反轉垂直速度，向上彈
+
+        // 計算撞擊點相對於擋板中心的偏移量
+        // 範圍從 -1 (最左邊) 到 1 (最右邊)
+        let hitSpot = (this.x - px) / (pw / 2); 
+        
+        // 根據撞擊點調整水平速度，最大水平速度為 7
+        this.speedX = hitSpot * 7; 
+      }
     }
   }
 
