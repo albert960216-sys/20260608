@@ -5,7 +5,7 @@ let paddleX = 200; // 擋板的初始 X 座標
 let ball;
 let modelLoaded = false; // 用於自我檢查模型載入狀態
 let bricks = [];
-let gameState = "WAITING"; // 遊戲狀態：WAITING, PLAY, GAMEOVER
+let gameState = "WAITING"; // 遊戲狀態：WAITING, PLAY, GAMEOVER, WIN
 const rows = 5; // 增加到 5 層
 const cols = 8;
 
@@ -76,7 +76,8 @@ function draw() {
     let indexFinger = hand.index_finger_tip;
     
     // 更新擋板座標
-    paddleX = indexFinger.x;
+    // 1. 偵測優化：使用 lerp 讓擋板移動更平滑，數值 0.2 可以根據需求調整（越小越平滑但延遲感較重）
+    paddleX = lerp(paddleX, indexFinger.x, 0.2);
 
     // 在食指尖端畫一個小圓點，方便確認偵測位置
     fill(0, 255, 0);
@@ -84,7 +85,7 @@ function draw() {
     ellipse(indexFinger.x, indexFinger.y, 15, 15);
 
     // 檢查是否「手部打開」以重新開始遊戲
-    if (gameState === "GAMEOVER") {
+    if (gameState === "GAMEOVER" || gameState === "WIN") {
       let isOpen = hand.index_finger_tip.y < hand.index_finger_pip.y &&
                    hand.middle_finger_tip.y < hand.middle_finger_pip.y &&
                    hand.ring_finger_tip.y < hand.ring_finger_pip.y &&
@@ -144,12 +145,18 @@ function draw() {
         bricks[i].active = false; // 撞到後磚塊消失
       }
     }
+    
+    // 2. 邏輯優化：增加勝利判定 (當沒有任何主動磚塊時)
+    let activeBricks = bricks.filter(b => b.active);
+    if (activeBricks.length === 0 && bricks.length > 0) {
+      gameState = "WIN";
+    }
 
     // 檢查是否掉落底部
     if (ball.y > height) {
       gameState = "GAMEOVER";
     }
-  } else {
+  } else if (gameState === "GAMEOVER") {
     // 遊戲結束畫面 (需要處理鏡像文字問題)
     push();
     scale(-1, 1); // 再次翻轉回來讓文字正常
@@ -160,6 +167,18 @@ function draw() {
     text("GAME OVER", width / 2, height / 2);
     textSize(20);
     text("Open Hand to Restart", width / 2, height / 2 + 50);
+    pop();
+  } else if (gameState === "WIN") {
+    // 3. 增加勝利畫面顯示
+    push();
+    scale(-1, 1);
+    translate(-width, 0);
+    fill(0, 150, 0);
+    textAlign(CENTER);
+    textSize(48);
+    text("YOU WIN!", width / 2, height / 2);
+    textSize(20);
+    text("Open Hand to Play Again", width / 2, height / 2 + 50);
     pop();
   }
 }
